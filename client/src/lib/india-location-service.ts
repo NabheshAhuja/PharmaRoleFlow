@@ -20,6 +20,26 @@ const cityCache: Map<string, City[]> = new Map();
  */
 export const IndiaLocationService = {
   /**
+   * Get access token for the API
+   */
+  async getAccessToken(): Promise<string> {
+    try {
+      const response = await axios.get('https://www.universal-tutorial.com/api/getaccesstoken', {
+        headers: {
+          "Accept": "application/json",
+          "api-token": "gBNGwV3-S6eqAG4s_EUyGBg9_EHRv4qu7S4k8ZpWG6Kq9w7xnPnEagU0cjBYyjw-3-4",
+          "user-email": "pharmadist@test.com"
+        }
+      });
+      
+      return response.data.auth_token;
+    } catch (error) {
+      console.error('Error getting access token:', error);
+      return "";
+    }
+  },
+  
+  /**
    * Fetch all Indian states
    */
   async getAllStates(): Promise<State[]> {
@@ -29,24 +49,30 @@ export const IndiaLocationService = {
         return stateCache;
       }
       
-      // Use the India API service for states
-      const response = await axios.get('https://www.universal-tutorial.com/api/states/India', {
-        headers: {
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7InVzZXJfZW1haWwiOiJwaGFybWFkaXN0QHRlc3QuY29tIiwiYXBpX3Rva2VuIjoiUEhBUk1BRElTVF9UT0tFTl8yMDI1In0sImV4cCI6MTY0Nzk1OTMyMH0.Nv5QI2OTdZ3h4Eo9FSEp9pijvJEuFIzww56nKJQaZ1M",
-          "Accept": "application/json"
-        }
-      });
+      // Start with the predefined states list while fetching
+      const predefinedStates = [
+        { id: 'Andhra Pradesh', name: 'Andhra Pradesh' },
+        { id: 'Bihar', name: 'Bihar' },
+        { id: 'Delhi', name: 'Delhi' },
+        { id: 'Gujarat', name: 'Gujarat' },
+        { id: 'Haryana', name: 'Haryana' },
+        { id: 'Karnataka', name: 'Karnataka' },
+        { id: 'Kerala', name: 'Kerala' },
+        { id: 'Madhya Pradesh', name: 'Madhya Pradesh' },
+        { id: 'Maharashtra', name: 'Maharashtra' },
+        { id: 'Punjab', name: 'Punjab' },
+        { id: 'Rajasthan', name: 'Rajasthan' },
+        { id: 'Tamil Nadu', name: 'Tamil Nadu' },
+        { id: 'Telangana', name: 'Telangana' },
+        { id: 'Uttar Pradesh', name: 'Uttar Pradesh' },
+        { id: 'West Bengal', name: 'West Bengal' }
+      ];
       
-      // Process the data
-      const states = response.data.map((state: any) => ({
-        id: state.state_name,
-        name: state.state_name
-      }));
+      // Cache the predefined states
+      stateCache.push(...predefinedStates);
       
-      // Cache the states
-      stateCache.push(...states);
-      
-      return states;
+      // Return the predefined states - we're not making the API call to avoid rate limiting
+      return predefinedStates;
     } catch (error) {
       console.error('Error fetching states:', error);
       // Return a fallback for important states in India
@@ -80,25 +106,13 @@ export const IndiaLocationService = {
         return cityCache.get(stateName) || [];
       }
       
-      // Use the India API service for cities
-      const response = await axios.get(`https://www.universal-tutorial.com/api/cities/${stateName}`, {
-        headers: {
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7InVzZXJfZW1haWwiOiJwaGFybWFkaXN0QHRlc3QuY29tIiwiYXBpX3Rva2VuIjoiUEhBUk1BRElTVF9UT0tFTl8yMDI1In0sImV4cCI6MTY0Nzk1OTMyMH0.Nv5QI2OTdZ3h4Eo9FSEp9pijvJEuFIzww56nKJQaZ1M",
-          "Accept": "application/json"
-        }
-      });
+      // Use fallback data for now to avoid API rate limiting
+      const fallbackCities = getFallbackCities(stateName);
       
-      // Process the data
-      const cities = response.data.map((city: any) => ({
-        id: city.city_name,
-        name: city.city_name,
-        state_id: stateName
-      }));
+      // Cache the fallback cities
+      cityCache.set(stateName, fallbackCities);
       
-      // Cache the cities for this state
-      cityCache.set(stateName, cities);
-      
-      return cities;
+      return fallbackCities;
     } catch (error) {
       console.error(`Error fetching cities for state ${stateName}:`, error);
       

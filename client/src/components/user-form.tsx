@@ -176,18 +176,21 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
     mutationFn: async (data: UserFormData) => {
       const { confirmPassword, ...userData } = data;
       
+      // Create the final data object with proper types
+      const finalUserData: any = { ...userData };
+      
       // Add location data
       if (region) {
-        userData.region = region;
+        finalUserData.region = region;
       }
       if (selectedState) {
-        userData.state = selectedState;
+        finalUserData.state = selectedState;
       }
       if (selectedCity) {
-        userData.city = selectedCity;
+        finalUserData.city = selectedCity;
       }
       
-      const res = await apiRequest("POST", "/api/users", userData);
+      const res = await apiRequest("POST", "/api/users", finalUserData);
       return res.json();
     },
     onSuccess: () => {
@@ -212,25 +215,28 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
     mutationFn: async (data: UserFormData) => {
       if (!user) return null;
       
-      const { confirmPassword, password, ...userData } = data;
+      const { confirmPassword, ...userData } = data;
       
-      // Only include password if provided
-      if (password) {
-        userData.password = password;
+      // Create the final data object with proper types
+      const finalUserData: any = { ...userData };
+      
+      // Only include password if provided (handle with type safety)
+      if (data.password) {
+        finalUserData.password = data.password;
       }
       
       // Add location data
       if (region) {
-        userData.region = region;
+        finalUserData.region = region;
       }
       if (selectedState) {
-        userData.state = selectedState;
+        finalUserData.state = selectedState;
       }
       if (selectedCity) {
-        userData.city = selectedCity;
+        finalUserData.city = selectedCity;
       }
       
-      const res = await apiRequest("PUT", `/api/users/${user.id}`, userData);
+      const res = await apiRequest("PUT", `/api/users/${user.id}`, finalUserData);
       return res.json();
     },
     onSuccess: () => {
@@ -522,33 +528,23 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
               
               {/* Address and Pincode */}
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter address" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <FormLabel>Address</FormLabel>
+                  <Input 
+                    placeholder="Enter address" 
+                    value={user?.address || ""} 
+                    onChange={(e) => form.setValue("address" as any, e.target.value)}
+                  />
+                </div>
                 
-                <FormField
-                  control={form.control}
-                  name="pincode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pincode</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter pincode" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <FormLabel>Pincode</FormLabel>
+                  <Input 
+                    placeholder="Enter pincode" 
+                    value={user?.pincode || ""} 
+                    onChange={(e) => form.setValue("pincode" as any, e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
