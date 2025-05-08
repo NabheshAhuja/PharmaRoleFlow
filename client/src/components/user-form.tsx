@@ -65,7 +65,7 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
 
   useEffect(() => {
     if (orgsData) {
-      setOrganizations(orgsData);
+      setOrganizations(orgsData || []);
     }
   }, [orgsData]);
 
