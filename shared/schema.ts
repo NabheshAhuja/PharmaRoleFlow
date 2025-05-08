@@ -51,6 +51,10 @@ export const users = pgTable("users", {
   status: text("status").notNull().$type<UserStatusType>().default("ACTIVE"),
   organizationId: integer("organization_id").references(() => organizations.id),
   region: text("region"),
+  state: text("state"),
+  city: text("city"),
+  pincode: text("pincode"),
+  address: text("address"),
   managerId: integer("manager_id"),
   lastLogin: timestamp("last_login"),
 });

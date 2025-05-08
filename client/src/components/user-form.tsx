@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { IndiaLocationService } from "@/lib/india-location-service";
 
 interface UserFormProps {
   open: boolean;
@@ -45,6 +46,16 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
   const isEditing = !!user;
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [region, setRegion] = useState<string>("");
+  
+  // India location state
+  const [states, setStates] = useState<{id: string, name: string}[]>([]);
+  const [cities, setCities] = useState<{id: string, name: string, state_id: string}[]>([]);
+  const [selectedState, setSelectedState] = useState<string>(user?.state || "");
+  const [selectedCity, setSelectedCity] = useState<string>(user?.city || "");
+  const [loading, setLoading] = useState({
+    states: false,
+    cities: false
+  });
 
   // Get organizations
   const { data: orgsData } = useQuery({
@@ -89,6 +100,8 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
         confirmPassword: "",
       });
       setRegion(user.region || "");
+      setSelectedState(user.state || "");
+      setSelectedCity(user.city || "");
     } else {
       form.reset({
         username: "",
@@ -103,17 +116,77 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
         managerId: null,
       });
       setRegion("");
+      setSelectedState("");
+      setSelectedCity("");
     }
   }, [user, form]);
+  
+  // Fetch Indian states when form opens
+  useEffect(() => {
+    if (open) {
+      const fetchStates = async () => {
+        setLoading(prev => ({ ...prev, states: true }));
+        try {
+          const statesData = await IndiaLocationService.getAllStates();
+          setStates(statesData);
+        } catch (error) {
+          console.error("Error fetching states:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load states. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoading(prev => ({ ...prev, states: false }));
+        }
+      };
+      
+      fetchStates();
+    }
+  }, [open, toast]);
+  
+  // Fetch cities when state changes
+  useEffect(() => {
+    if (selectedState) {
+      const fetchCities = async () => {
+        setLoading(prev => ({ ...prev, cities: true }));
+        try {
+          const citiesData = await IndiaLocationService.getCitiesByState(selectedState);
+          setCities(citiesData);
+        } catch (error) {
+          console.error("Error fetching cities:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load cities. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoading(prev => ({ ...prev, cities: false }));
+        }
+      };
+      
+      fetchCities();
+    } else {
+      setCities([]);
+    }
+  }, [selectedState, toast]);
 
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
       const { confirmPassword, ...userData } = data;
-      // If region is provided, add it to userData
+      
+      // Add location data
       if (region) {
         userData.region = region;
       }
+      if (selectedState) {
+        userData.state = selectedState;
+      }
+      if (selectedCity) {
+        userData.city = selectedCity;
+      }
+      
       const res = await apiRequest("POST", "/api/users", userData);
       return res.json();
     },
@@ -146,9 +219,15 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
         userData.password = password;
       }
       
-      // If region is provided, add it to userData
+      // Add location data
       if (region) {
         userData.region = region;
+      }
+      if (selectedState) {
+        userData.state = selectedState;
+      }
+      if (selectedCity) {
+        userData.city = selectedCity;
       }
       
       const res = await apiRequest("PUT", `/api/users/${user.id}`, userData);
@@ -377,6 +456,100 @@ export function UserForm({ open, onClose, user }: UserFormProps) {
                   Only applicable for RSM, ASM, and MR roles
                 </p>
               </FormItem>
+            </div>
+            
+            {/* India location fields */}
+            <div className="border rounded-md p-4 bg-slate-50">
+              <h3 className="text-md font-medium mb-3">India Location Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormItem>
+                  <FormLabel>State</FormLabel>
+                  <Select
+                    onValueChange={setSelectedState}
+                    defaultValue={selectedState}
+                    value={selectedState}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {loading.states ? (
+                        <SelectItem value="loading" disabled>
+                          Loading states...
+                        </SelectItem>
+                      ) : (
+                        states.map((state) => (
+                          <SelectItem key={state.id} value={state.id}>
+                            {state.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <Select
+                    onValueChange={setSelectedCity}
+                    defaultValue={selectedCity}
+                    value={selectedCity}
+                    disabled={!selectedState || loading.cities}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={!selectedState ? "Select state first" : "Select city"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {loading.cities ? (
+                        <SelectItem value="loading" disabled>
+                          Loading cities...
+                        </SelectItem>
+                      ) : (
+                        cities.map((city) => (
+                          <SelectItem key={city.id} value={city.id}>
+                            {city.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              </div>
+              
+              {/* Address and Pincode */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="pincode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pincode</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter pincode" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <FormField
