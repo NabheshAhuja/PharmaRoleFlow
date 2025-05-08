@@ -52,11 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Set the user data in the cache
       queryClient.setQueryData(["/api/user"], user);
+      
+      // Force a refetch of user data to ensure state is updated
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.fullName}!`,
       });
+      
+      // Manually redirect to dashboard if needed
+      if (window.location.pathname === "/auth") {
+        window.location.href = "/";
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -75,11 +85,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Set the user data in the cache
       queryClient.setQueryData(["/api/user"], user);
+      
+      // Force a refetch of user data to ensure state is updated
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.fullName}!`,
       });
+      
+      // Manually redirect to dashboard if needed
+      if (window.location.pathname === "/auth") {
+        window.location.href = "/";
+      }
     },
     onError: (error: Error) => {
       toast({

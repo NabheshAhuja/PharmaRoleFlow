@@ -101,19 +101,18 @@ export function Sidebar({ isMobileSidebarOpen, setMobileSidebarOpen }: SidebarPr
           <ul className="space-y-1 px-3">
             {sidebarLinks.map((link) => (
               <li key={link.href}>
-                <Link href={link.href}>
-                  <a
-                    onClick={closeMobileSidebar}
-                    className={cn(
-                      "flex items-center px-3 py-2 text-sm rounded-md font-medium",
-                      link.current 
-                        ? "bg-primary-50 text-primary border-l-2 border-primary" 
-                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                    )}
-                  >
-                    <link.icon className={cn("mr-2 h-4 w-4", link.current ? "text-primary" : "text-slate-500")} />
-                    {link.label}
-                  </a>
+                <Link 
+                  href={link.href}
+                  onClick={closeMobileSidebar}
+                  className={cn(
+                    "flex items-center px-3 py-2 text-sm rounded-md font-medium",
+                    link.current 
+                      ? "bg-primary-50 text-primary border-l-2 border-primary" 
+                      : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                  )}
+                >
+                  <link.icon className={cn("mr-2 h-4 w-4", link.current ? "text-primary" : "text-slate-500")} />
+                  {link.label}
                 </Link>
               </li>
             ))}
@@ -128,19 +127,18 @@ export function Sidebar({ isMobileSidebarOpen, setMobileSidebarOpen }: SidebarPr
                 <ul className="mt-1 space-y-1">
                   {adminLinks.map((link) => (
                     <li key={link.href}>
-                      <Link href={link.href}>
-                        <a
-                          onClick={closeMobileSidebar}
-                          className={cn(
-                            "flex items-center px-3 py-2 text-sm rounded-md font-medium",
-                            link.current 
-                              ? "bg-primary-50 text-primary border-l-2 border-primary" 
-                              : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                          )}
-                        >
-                          <link.icon className={cn("mr-2 h-4 w-4", link.current ? "text-primary" : "text-slate-500")} />
-                          {link.label}
-                        </a>
+                      <Link 
+                        href={link.href}
+                        onClick={closeMobileSidebar}
+                        className={cn(
+                          "flex items-center px-3 py-2 text-sm rounded-md font-medium",
+                          link.current 
+                            ? "bg-primary-50 text-primary border-l-2 border-primary" 
+                            : "text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                        )}
+                      >
+                        <link.icon className={cn("mr-2 h-4 w-4", link.current ? "text-primary" : "text-slate-500")} />
+                        {link.label}
                       </Link>
                     </li>
                   ))}
