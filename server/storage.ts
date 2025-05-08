@@ -1,11 +1,10 @@
-import { activities, users, organizations, type User, type InsertUser, type Organization, type InsertOrganization, type Activity, type InsertActivity } from "@shared/schema";
+import { UserRole, UserStatus, OrganizationType, users, organizations, activities, type User, type InsertUser, type Organization, type InsertOrganization, type Activity, type InsertActivity } from "@shared/schema";
 import session from "express-session";
+import { createHash } from "crypto";
 import createMemoryStore from "memorystore";
 
 const MemoryStore = createMemoryStore(session);
 
-// modify the interface with any CRUD methods
-// you might need
 export interface IStorage {
   // User management
   getUser(id: number): Promise<User | undefined>;
@@ -31,14 +30,19 @@ export interface IStorage {
   getActivitiesByUser(userId: number): Promise<Activity[]>;
 
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
+}
+
+// Helper to hash passwords
+function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private organizations: Map<number, Organization>;
   private activities: Map<number, Activity>;
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
   currentUserId: number;
   currentOrgId: number;
   currentActivityId: number;
@@ -50,49 +54,51 @@ export class MemStorage implements IStorage {
     this.currentUserId = 1;
     this.currentOrgId = 1;
     this.currentActivityId = 1;
+    
     this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // Prune expired entries every 24h
+      checkPeriod: 86400000 // prune expired entries every 24h
     });
     
-    // Initialize with some default data
     this.initializeData();
   }
 
   private initializeData() {
-    // Add a system organization
+    // Create system organization
     const systemOrg: Organization = {
       id: this.currentOrgId++,
       name: "System Administration",
-      type: "SYSTEM"
+      type: OrganizationType.SYSTEM
     };
     this.organizations.set(systemOrg.id, systemOrg);
-
-    // Add a super admin user
-    // Use a simple hash that the auth system can verify without scrypt
+    
+    // Create super admin user
     const superAdmin: User = {
       id: this.currentUserId++,
       username: "admin",
-      password: "ADMIN_PASS", // Special marker for the default admin password
+      password: hashPassword("admin"), // In a real app, we'd use bcrypt or similar
       fullName: "Admin User",
-      email: "admin@pharmadist.com",
-      role: "SUPER_ADMIN",
-      status: "ACTIVE",
+      email: "admin@example.com",
+      role: UserRole.SUPER_ADMIN,
+      status: UserStatus.ACTIVE,
       organizationId: systemOrg.id,
       region: null,
+      state: null,
+      city: null,
+      pincode: null,
+      address: null,
       managerId: null,
       lastLogin: null
     };
     this.users.set(superAdmin.id, superAdmin);
   }
 
-  // User Methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    return Promise.resolve(this.users.get(id));
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+    return Promise.resolve(
+      Array.from(this.users.values()).find(user => user.username === username)
     );
   }
 
@@ -100,87 +106,101 @@ export class MemStorage implements IStorage {
     const id = this.currentUserId++;
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
-    return user;
+    return Promise.resolve(user);
   }
 
   async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
     const existingUser = this.users.get(id);
-    if (!existingUser) return undefined;
+    if (!existingUser) return Promise.resolve(undefined);
     
     const updatedUser = { ...existingUser, ...user };
     this.users.set(id, updatedUser);
-    return updatedUser;
+    return Promise.resolve(updatedUser);
   }
 
   async deleteUser(id: number): Promise<boolean> {
-    return this.users.delete(id);
+    return Promise.resolve(this.users.delete(id));
   }
 
   async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+    return Promise.resolve(Array.from(this.users.values()));
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.role === role);
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(user => user.role === role)
+    );
   }
 
   async getUsersByOrganization(organizationId: number): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.organizationId === organizationId);
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(
+        user => user.organizationId === organizationId
+      )
+    );
   }
 
   async getUsersByManager(managerId: number): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.managerId === managerId);
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(
+        user => user.managerId === managerId
+      )
+    );
   }
 
-  // Organization Methods
   async getOrganization(id: number): Promise<Organization | undefined> {
-    return this.organizations.get(id);
+    return Promise.resolve(this.organizations.get(id));
   }
 
   async createOrganization(organization: InsertOrganization): Promise<Organization> {
     const id = this.currentOrgId++;
     const newOrg: Organization = { ...organization, id };
     this.organizations.set(id, newOrg);
-    return newOrg;
+    return Promise.resolve(newOrg);
   }
 
   async updateOrganization(id: number, organization: Partial<InsertOrganization>): Promise<Organization | undefined> {
     const existingOrg = this.organizations.get(id);
-    if (!existingOrg) return undefined;
+    if (!existingOrg) return Promise.resolve(undefined);
     
     const updatedOrg = { ...existingOrg, ...organization };
     this.organizations.set(id, updatedOrg);
-    return updatedOrg;
+    return Promise.resolve(updatedOrg);
   }
 
   async deleteOrganization(id: number): Promise<boolean> {
-    return this.organizations.delete(id);
+    return Promise.resolve(this.organizations.delete(id));
   }
 
   async getAllOrganizations(): Promise<Organization[]> {
-    return Array.from(this.organizations.values());
+    return Promise.resolve(Array.from(this.organizations.values()));
   }
 
-  // Activity Methods
   async createActivity(activity: InsertActivity): Promise<Activity> {
     const id = this.currentActivityId++;
     const timestamp = new Date();
     const newActivity: Activity = { ...activity, id, timestamp };
     this.activities.set(id, newActivity);
-    return newActivity;
+    return Promise.resolve(newActivity);
   }
 
   async getActivities(limit?: number): Promise<Activity[]> {
-    const allActivities = Array.from(this.activities.values())
+    const activities = Array.from(this.activities.values())
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     
-    return limit ? allActivities.slice(0, limit) : allActivities;
+    if (limit) {
+      return Promise.resolve(activities.slice(0, limit));
+    }
+    
+    return Promise.resolve(activities);
   }
 
   async getActivitiesByUser(userId: number): Promise<Activity[]> {
-    return Array.from(this.activities.values())
-      .filter(activity => activity.userId === userId)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return Promise.resolve(
+      Array.from(this.activities.values())
+        .filter(activity => activity.userId === userId)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    );
   }
 }
 
