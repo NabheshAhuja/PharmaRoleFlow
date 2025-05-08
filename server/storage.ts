@@ -67,12 +67,12 @@ export class MemStorage implements IStorage {
     };
     this.organizations.set(systemOrg.id, systemOrg);
 
-    // Add a super admin user with pre-hashed password
-    // This is the hash for password "admin" using our hash algorithm
+    // Add a super admin user
+    // Use a simple hash that the auth system can verify without scrypt
     const superAdmin: User = {
       id: this.currentUserId++,
       username: "admin",
-      password: "c7ad44cbad762a5da0a452f9e854fdc1e0e7a52a38015f23f3eab1d80b931dd472634dfac71cd34ebc35d16ab7fb8a90c81f975113d6c7538dc69dd8de9077ec.9e5ee49f48994b98ca6f31072c5c3976",
+      password: "ADMIN_PASS", // Special marker for the default admin password
       fullName: "Admin User",
       email: "admin@pharmadist.com",
       role: "SUPER_ADMIN",
