@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { storage } from "./storage";
+import { storage, MemStorage } from "./storage";
 import { db } from "./db";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
@@ -40,7 +40,30 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // No database initialization for now
+  try {
+    // Initialize the database if needed
+    if (process.env.DATABASE_URL) {
+      log("Connecting to database...");
+      
+      // Initialize database with required data
+      if (storage instanceof MemStorage) {
+        log("Using in-memory storage");
+      } else {
+        log("Using database storage");
+        try {
+          await (storage as any).initializeDatabase();
+          log("Database initialization complete");
+        } catch (error) {
+          console.error("Database initialization error:", error);
+          // Continue even if database initialization fails
+          log("Continuing with application startup despite database error");
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error during startup:", error);
+    // Continue despite errors to ensure application starts
+  }
   
   const server = await registerRoutes(app);
 
