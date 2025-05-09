@@ -12,14 +12,9 @@ declare global {
   }
 }
 
-// This function matches the hash function in storage.ts
+// Simple password hashing function matching storage.ts implementation
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
-}
-
-// Simple direct comparison for development
-function comparePasswords(supplied: string, stored: string): boolean {
-  return hashPassword(supplied) === stored;
 }
 
 export function setupAuth(app: Express) {
@@ -49,21 +44,15 @@ export function setupAuth(app: Express) {
           return done(null, false);
         }
         
-        // Special case for admin user (removed - using normal auth flow)
-        if (user.username === 'admin' && comparePasswords(password, user.password)) {
-          // Update last login time
-          await storage.updateUser(user.id, { lastLogin: new Date() });
-          return done(null, user);
+        // Check password - hash the provided password and compare with stored hash
+        const hashedPassword = hashPassword(password);
+        if (hashedPassword !== user.password) {
+          return done(null, false);
         }
         
-        // Regular case for all other users
-        if (!comparePasswords(password, user.password)) {
-          return done(null, false);
-        } else {
-          // Update last login time
-          await storage.updateUser(user.id, { lastLogin: new Date() });
-          return done(null, user);
-        }
+        // Password matches - update last login time and return user
+        await storage.updateUser(user.id, { lastLogin: new Date() });
+        return done(null, user);
       } catch (error) {
         console.error("Authentication error:", error);
         return done(error);
@@ -145,7 +134,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", async (err: any, user: SelectUser, info: any) => {
+    passport.authenticate("local", (err: any, user: SelectUser, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid credentials" });
       
