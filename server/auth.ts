@@ -2,8 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 import { User as SelectUser, UserRole, UserStatus } from "@shared/schema";
 
@@ -13,19 +12,14 @@ declare global {
   }
 }
 
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+// This function matches the hash function in storage.ts
+function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
 
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+// Simple direct comparison for development
+function comparePasswords(supplied: string, stored: string): boolean {
+  return hashPassword(supplied) === stored;
 }
 
 export function setupAuth(app: Express) {
@@ -55,15 +49,15 @@ export function setupAuth(app: Express) {
           return done(null, false);
         }
         
-        // Special case for admin user with default password
-        if (user.username === 'admin' && user.password === 'ADMIN_PASS' && password === 'admin') {
+        // Special case for admin user (removed - using normal auth flow)
+        if (user.username === 'admin' && comparePasswords(password, user.password)) {
           // Update last login time
           await storage.updateUser(user.id, { lastLogin: new Date() });
           return done(null, user);
         }
         
         // Regular case for all other users
-        if (!(await comparePasswords(password, user.password))) {
+        if (!comparePasswords(password, user.password)) {
           return done(null, false);
         } else {
           // Update last login time
@@ -128,7 +122,7 @@ export function setupAuth(app: Express) {
 
       const user = await storage.createUser({
         ...req.body,
-        password: await hashPassword(req.body.password),
+        password: hashPassword(req.body.password),
         status: UserStatus.ACTIVE
       });
 
