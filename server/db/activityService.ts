@@ -3,7 +3,7 @@ import {
   activities
 } from "@shared/schema";
 import { db } from "../db";
-import { desc, eq, SQL } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 /**
  * Activity tracking service
@@ -36,15 +36,20 @@ export class ActivityService {
    */
   async getActivities(limit?: number): Promise<Activity[]> {
     try {
-      // Use Drizzle ORM to select activities with ordering
-      const query = db.select().from(activities).orderBy(desc(activities.timestamp));
+      // Use SQL directly for more flexibility
+      const query = limit 
+        ? sql`SELECT * FROM activities ORDER BY timestamp DESC LIMIT ${limit}` 
+        : sql`SELECT * FROM activities ORDER BY timestamp DESC`;
+        
+      const result = await db.execute(query);
       
-      // Execute the query with or without limit
-      if (limit) {
-        return await query.limit(limit);
-      } else {
-        return await query;
-      }
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        userId: row.user_id ? Number(row.user_id) : null,
+        action: String(row.action),
+        description: String(row.description),
+        timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp)
+      }));
     } catch (error) {
       console.error('Error in getActivities:', error);
       throw error;
@@ -56,10 +61,19 @@ export class ActivityService {
    */
   async getActivitiesByUser(userId: number): Promise<Activity[]> {
     try {
-      return await db.select()
-        .from(activities)
-        .where(eq(activities.userId, userId))
-        .orderBy(desc(activities.timestamp));
+      const result = await db.execute(sql`
+        SELECT * FROM activities 
+        WHERE user_id = ${userId}
+        ORDER BY timestamp DESC
+      `);
+      
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        userId: row.user_id ? Number(row.user_id) : null,
+        action: String(row.action),
+        description: String(row.description),
+        timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp)
+      }));
     } catch (error) {
       console.error('Error in getActivitiesByUser:', error);
       throw error;

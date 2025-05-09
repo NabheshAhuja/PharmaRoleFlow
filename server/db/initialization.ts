@@ -2,7 +2,7 @@ import {
   UserRole, UserStatus, OrganizationType, organizations
 } from "@shared/schema";
 import { db } from "../db";
-import { count } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { hashPassword } from "./utils";
 import { organizationService } from "./organizationService";
 import { userService } from "./userService";
@@ -20,8 +20,9 @@ export class InitializationService {
   async initializeDatabase(): Promise<void> {
     try {
       // Check if we need to initialize (no organizations exist)
-      const result = await db.select({ count: countAll() }).from(organizations);
-      if (result[0].count > 0) {
+      const result = await db.execute(sql`SELECT COUNT(*) as count FROM organizations`);
+      const count = result.rows[0].count;
+      if (count && parseInt(count.toString()) > 0) {
         console.log('Database already initialized, skipping...');
         return;
       }
