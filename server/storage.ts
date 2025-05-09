@@ -5,7 +5,7 @@ import {
 import session from "express-session";
 
 // Import the DatabaseStorage implementation
-import { DatabaseStorage } from './database-storage';
+import { DatabaseStorage } from './db';
 
 export interface IStorage {
   // User management
