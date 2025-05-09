@@ -7,8 +7,9 @@ import {
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { createHash } from "crypto";
-import { Pool, QueryResult } from "pg";
-
+import * as pg from 'pg'
+import dotenv from 'dotenv';
+const { Pool } = pg
 // PostgreSQL session store for session persistence
 const PostgresSessionStore = connectPg(session);
 
@@ -25,6 +26,8 @@ export class DatabaseStorage implements IStorage {
   private pool: Pool;
 
   constructor() {
+    dotenv.config();
+    
     // Create a new PostgreSQL pool if DATABASE_URL is available
     if (process.env.DATABASE_URL) {
       this.pool = new Pool({ 

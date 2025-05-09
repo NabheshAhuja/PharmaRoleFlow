@@ -1,9 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
+import dotenv from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { storage, MemStorage } from "./storage";
-import { db } from "./db";
+import { storage } from "./storage";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -46,9 +49,9 @@ app.use((req, res, next) => {
       log("Connecting to database...");
       
       // Initialize database with required data
-      if (storage instanceof MemStorage) {
-        log("Using in-memory storage");
-      } else {
+      // if (storage instanceof MemStorage) {
+      //   log("Using in-memory storage");
+      // } else {
         log("Using database storage");
         try {
           await (storage as any).initializeDatabase();
@@ -58,7 +61,7 @@ app.use((req, res, next) => {
           // Continue even if database initialization fails
           log("Continuing with application startup despite database error");
         }
-      }
+      // }
     }
   } catch (error) {
     console.error("Error during startup:", error);
