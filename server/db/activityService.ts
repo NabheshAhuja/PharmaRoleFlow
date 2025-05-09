@@ -1,16 +1,15 @@
 import { 
-  type Activity, type InsertActivity 
+  type Activity, type InsertActivity,
+  activities
 } from "@shared/schema";
-import { dbConnection } from "./connection";
-import { mapActivityFromDb } from "./utils";
+import { db } from "../db";
+import { desc, eq, SQL } from "drizzle-orm";
 
 /**
  * Activity tracking service
- * Handles all activity-related database operations
+ * Handles all activity-related database operations using Drizzle ORM
  */
 export class ActivityService {
-  private pool = dbConnection.getPool();
-
   /**
    * Create a new activity log entry
    */
@@ -18,12 +17,14 @@ export class ActivityService {
     try {
       const { userId, action, description } = activityData;
       
-      const result = await this.pool.query(
-        'INSERT INTO activities (user_id, action, description) VALUES ($1, $2, $3) RETURNING *',
-        [userId, action, description]
-      );
+      // Use Drizzle ORM to insert the activity
+      const [newActivity] = await db.insert(activities).values([{
+        userId,
+        action,
+        description
+      }]).returning();
       
-      return mapActivityFromDb(result.rows[0]);
+      return newActivity;
     } catch (error) {
       console.error('Error in createActivity:', error);
       throw error;
@@ -35,16 +36,15 @@ export class ActivityService {
    */
   async getActivities(limit?: number): Promise<Activity[]> {
     try {
-      let query = 'SELECT * FROM activities ORDER BY timestamp DESC';
-      const params = [];
+      // Use Drizzle ORM to select activities with ordering
+      const query = db.select().from(activities).orderBy(desc(activities.timestamp));
       
+      // Execute the query with or without limit
       if (limit) {
-        query += ' LIMIT $1';
-        params.push(limit);
+        return await query.limit(limit);
+      } else {
+        return await query;
       }
-      
-      const result = await this.pool.query(query, params);
-      return result.rows.map((row: any) => mapActivityFromDb(row));
     } catch (error) {
       console.error('Error in getActivities:', error);
       throw error;
@@ -56,12 +56,10 @@ export class ActivityService {
    */
   async getActivitiesByUser(userId: number): Promise<Activity[]> {
     try {
-      const result = await this.pool.query(
-        'SELECT * FROM activities WHERE user_id = $1 ORDER BY timestamp DESC',
-        [userId]
-      );
-      
-      return result.rows.map((row: any) => mapActivityFromDb(row));
+      return await db.select()
+        .from(activities)
+        .where(eq(activities.userId, userId))
+        .orderBy(desc(activities.timestamp));
     } catch (error) {
       console.error('Error in getActivitiesByUser:', error);
       throw error;

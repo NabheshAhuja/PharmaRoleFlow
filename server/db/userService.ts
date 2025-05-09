@@ -81,11 +81,63 @@ export class UserService {
    */
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
     try {
-      const updateData = { ...userData };
+      // Create a proper update object with type casting
+      const updateData: Record<string, any> = {};
       
-      // Hash password if provided
-      if (updateData.password) {
-        updateData.password = hashPassword(updateData.password);
+      if (userData.username !== undefined) {
+        updateData.username = userData.username;
+      }
+      
+      if (userData.password !== undefined) {
+        updateData.password = hashPassword(userData.password);
+      }
+      
+      if (userData.fullName !== undefined) {
+        updateData.fullName = userData.fullName;
+      }
+      
+      if (userData.email !== undefined) {
+        updateData.email = userData.email;
+      }
+      
+      if (userData.role !== undefined) {
+        updateData.role = userData.role as UserRoleType;
+      }
+      
+      if (userData.status !== undefined) {
+        updateData.status = userData.status as UserStatusType;
+      }
+      
+      if (userData.organizationId !== undefined) {
+        updateData.organizationId = userData.organizationId;
+      }
+      
+      if (userData.region !== undefined) {
+        updateData.region = userData.region;
+      }
+      
+      if (userData.state !== undefined) {
+        updateData.state = userData.state;
+      }
+      
+      if (userData.city !== undefined) {
+        updateData.city = userData.city;
+      }
+      
+      if (userData.pincode !== undefined) {
+        updateData.pincode = userData.pincode;
+      }
+      
+      if (userData.address !== undefined) {
+        updateData.address = userData.address;
+      }
+      
+      if (userData.managerId !== undefined) {
+        updateData.managerId = userData.managerId;
+      }
+      
+      if (userData.lastLogin !== undefined) {
+        updateData.lastLogin = userData.lastLogin;
       }
       
       if (Object.keys(updateData).length === 0) {
@@ -136,7 +188,7 @@ export class UserService {
    */
   async getUsersByRole(role: string): Promise<User[]> {
     try {
-      return await db.select().from(users).where(eq(users.role, role));
+      return await db.select().from(users).where(eq(users.role, role as UserRoleType));
     } catch (error) {
       console.error('Error in getUsersByRole:', error);
       throw error;

@@ -1,7 +1,8 @@
 import { 
-  UserRole, UserStatus, OrganizationType 
+  UserRole, UserStatus, OrganizationType, organizations
 } from "@shared/schema";
-import { dbConnection } from "./connection";
+import { db } from "../db";
+import { count } from "drizzle-orm";
 import { hashPassword } from "./utils";
 import { organizationService } from "./organizationService";
 import { userService } from "./userService";
@@ -11,8 +12,6 @@ import { userService } from "./userService";
  * Handles creating initial data in the database
  */
 export class InitializationService {
-  private pool = dbConnection.getPool();
-
   /**
    * Initialize the database with required data
    * - Creates system organization if not exists
@@ -21,8 +20,8 @@ export class InitializationService {
   async initializeDatabase(): Promise<void> {
     try {
       // Check if we need to initialize (no organizations exist)
-      const result = await this.pool.query('SELECT COUNT(*) FROM organizations');
-      if (parseInt(result.rows[0].count) > 0) {
+      const result = await db.select({ count: countAll() }).from(organizations);
+      if (result[0].count > 0) {
         console.log('Database already initialized, skipping...');
         return;
       }
@@ -38,7 +37,7 @@ export class InitializationService {
       // Create admin user
       await userService.createUser({
         username: 'admin',
-        password: hashPassword('admin'),
+        password: 'admin', // Will be hashed in the service
         fullName: 'Admin User',
         email: 'admin@example.com',
         role: UserRole.SUPER_ADMIN,

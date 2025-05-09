@@ -1,9 +1,9 @@
 import { 
-  type Organization, type InsertOrganization,
-  organizations 
+  type Organization, type InsertOrganization, type OrganizationTypeType,
+  organizations, OrganizationType
 } from "@shared/schema";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, SQL } from "drizzle-orm";
 
 /**
  * Organization management service
@@ -28,7 +28,14 @@ export class OrganizationService {
    */
   async createOrganization(orgData: InsertOrganization): Promise<Organization> {
     try {
-      const [newOrg] = await db.insert(organizations).values(orgData).returning();
+      const { name, type } = orgData;
+      
+      // Use Drizzle ORM to insert the organization with proper typing
+      const [newOrg] = await db.insert(organizations).values([{
+        name,
+        type: type as OrganizationTypeType
+      }]).returning();
+      
       return newOrg;
     } catch (error) {
       console.error('Error in createOrganization:', error);
@@ -41,12 +48,25 @@ export class OrganizationService {
    */
   async updateOrganization(id: number, orgData: Partial<InsertOrganization>): Promise<Organization | undefined> {
     try {
-      if (Object.keys(orgData).length === 0) {
+      // Create a proper update object with type casting
+      const updateData: Record<string, any> = {};
+      
+      if (orgData.name !== undefined) {
+        updateData.name = orgData.name;
+      }
+      
+      if (orgData.type !== undefined) {
+        updateData.type = orgData.type as OrganizationTypeType;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        // No fields to update, return existing organization
         return this.getOrganization(id);
       }
       
+      // Use Drizzle ORM to update the organization
       const [updatedOrg] = await db.update(organizations)
-        .set(orgData)
+        .set(updateData)
         .where(eq(organizations.id, id))
         .returning();
       
