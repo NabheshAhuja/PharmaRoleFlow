@@ -4,8 +4,8 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 
-// Import the DatabaseStorage implementation
-import { DatabaseStorage } from './db';
+// Import the database storage implementation
+import { DatabaseStorage } from './db/index';
 
 export interface IStorage {
   // User management
