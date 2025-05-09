@@ -204,4 +204,5 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Use in-memory storage for development
 export const storage = new MemStorage();
