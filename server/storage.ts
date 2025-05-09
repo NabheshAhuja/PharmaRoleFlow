@@ -1,12 +1,9 @@
 import { UserRole, UserStatus, OrganizationType, users, organizations, activities, type User, type InsertUser, type Organization, type InsertOrganization, type Activity, type InsertActivity } from "@shared/schema";
 import session from "express-session";
 import { createHash } from "crypto";
-import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
-import connectPg from "connect-pg-simple";
-import { pool } from './db';
+import createMemoryStore from "memorystore";
 
-const PostgresSessionStore = connectPg(session);
+const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   // User management
@@ -36,287 +33,175 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class DatabaseStorage implements IStorage {
+// Helper to hash passwords
+function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<number, User>;
+  private organizations: Map<number, Organization>;
+  private activities: Map<number, Activity>;
   sessionStore: session.Store;
+  currentUserId: number;
+  currentOrgId: number;
+  currentActivityId: number;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      tableName: 'session',
-      createTableIfMissing: true 
+    this.users = new Map();
+    this.organizations = new Map();
+    this.activities = new Map();
+    this.currentUserId = 1;
+    this.currentOrgId = 1;
+    this.currentActivityId = 1;
+    
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
     });
-    this.initializeDatabase();
+    
+    this.initializeData();
   }
 
-  private async initializeDatabase() {
-    try {
-      // Check if we have any organizations
-      const result = await db.execute(sql`SELECT COUNT(*) FROM organizations`);
-      const count = parseInt(result.rows[0].count);
-      
-      if (count === 0) {
-        console.log("Initializing database with default data...");
-        
-        // Create system organization
-        const [systemOrg] = await db.insert(organizations).values({
-          name: "System Administration",
-          type: "SYSTEM"
-        }).returning();
-        
-        // Create admin user
-        await db.insert(users).values({
-          username: "admin",
-          password: this.hashPassword("admin"),
-          fullName: "Admin User",
-          email: "admin@example.com",
-          role: "SUPER_ADMIN",
-          status: "ACTIVE",
-          organizationId: systemOrg.id
-        });
-        
-        console.log("Database initialized with admin user and system organization");
-      }
-    } catch (error) {
-      console.error("Error initializing database:", error);
-    }
-  }
-
-  private hashPassword(password: string): string {
-    return createHash('sha256').update(password).digest('hex');
+  private initializeData() {
+    // Create system organization
+    const systemOrg: Organization = {
+      id: this.currentOrgId++,
+      name: "System Administration",
+      type: OrganizationType.SYSTEM
+    };
+    this.organizations.set(systemOrg.id, systemOrg);
+    
+    // Create super admin user
+    const superAdmin: User = {
+      id: this.currentUserId++,
+      username: "admin",
+      password: hashPassword("admin"), // In a real app, we'd use bcrypt or similar
+      fullName: "Admin User",
+      email: "admin@example.com",
+      role: UserRole.SUPER_ADMIN,
+      status: UserStatus.ACTIVE,
+      organizationId: systemOrg.id,
+      region: null,
+      state: null,
+      city: null,
+      pincode: null,
+      address: null,
+      managerId: null,
+      lastLogin: null
+    };
+    this.users.set(superAdmin.id, superAdmin);
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE id = ${id}`);
-      return result.rows[0] as User | undefined;
-    } catch (error) {
-      console.error('Error getting user by ID:', error);
-      return undefined;
-    }
+    return Promise.resolve(this.users.get(id));
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE username = ${username}`);
-      return result.rows[0] as User | undefined;
-    } catch (error) {
-      console.error('Error getting user by username:', error);
-      return undefined;
-    }
+    return Promise.resolve(
+      Array.from(this.users.values()).find(user => user.username === username)
+    );
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    try {
-      // Handle optional fields
-      const columns = Object.keys(user).filter(key => user[key as keyof InsertUser] !== undefined);
-      const values = columns.map(key => user[key as keyof InsertUser]);
-      
-      // Create the SQL query dynamically
-      const columnsStr = columns.join(', ');
-      const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
-      
-      const query = `INSERT INTO users (${columnsStr}) VALUES (${placeholders}) RETURNING *`;
-      const result = await db.execute(sql.raw(query), ...values);
-      
-      return result.rows[0] as User;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentUserId++;
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return Promise.resolve(user);
   }
 
-  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
-    try {
-      // Filter out undefined values and create SET clauses
-      const updateColumns = Object.keys(userData)
-        .filter(key => userData[key as keyof Partial<InsertUser>] !== undefined)
-        .map((key, index) => `${key} = $${index + 2}`);
-      
-      if (updateColumns.length === 0) {
-        // Nothing to update
-        return this.getUser(id);
-      }
-      
-      const values = Object.values(userData).filter(value => value !== undefined);
-      const query = `UPDATE users SET ${updateColumns.join(', ')} WHERE id = $1 RETURNING *`;
-      
-      const result = await db.execute(sql.raw(query), id, ...values);
-      return result.rows[0] as User;
-    } catch (error) {
-      console.error('Error updating user:', error);
-      return undefined;
-    }
+  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) return Promise.resolve(undefined);
+    
+    const updatedUser = { ...existingUser, ...user };
+    this.users.set(id, updatedUser);
+    return Promise.resolve(updatedUser);
   }
 
   async deleteUser(id: number): Promise<boolean> {
-    try {
-      await db.execute(sql`DELETE FROM users WHERE id = ${id}`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      return false;
-    }
+    return Promise.resolve(this.users.delete(id));
   }
 
   async getAllUsers(): Promise<User[]> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users`);
-      return result.rows as User[];
-    } catch (error) {
-      console.error('Error getting all users:', error);
-      return [];
-    }
+    return Promise.resolve(Array.from(this.users.values()));
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE role = ${role}`);
-      return result.rows as User[];
-    } catch (error) {
-      console.error('Error getting users by role:', error);
-      return [];
-    }
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(user => user.role === role)
+    );
   }
 
   async getUsersByOrganization(organizationId: number): Promise<User[]> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE organization_id = ${organizationId}`);
-      return result.rows as User[];
-    } catch (error) {
-      console.error('Error getting users by organization:', error);
-      return [];
-    }
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(
+        user => user.organizationId === organizationId
+      )
+    );
   }
 
   async getUsersByManager(managerId: number): Promise<User[]> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE manager_id = ${managerId}`);
-      return result.rows as User[];
-    } catch (error) {
-      console.error('Error getting users by manager:', error);
-      return [];
-    }
+    return Promise.resolve(
+      Array.from(this.users.values()).filter(
+        user => user.managerId === managerId
+      )
+    );
   }
 
   async getOrganization(id: number): Promise<Organization | undefined> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM organizations WHERE id = ${id}`);
-      return result.rows[0] as Organization | undefined;
-    } catch (error) {
-      console.error('Error getting organization:', error);
-      return undefined;
-    }
+    return Promise.resolve(this.organizations.get(id));
   }
 
   async createOrganization(organization: InsertOrganization): Promise<Organization> {
-    try {
-      // Create dynamic SQL for inserting
-      const columns = Object.keys(organization);
-      const values = Object.values(organization);
-      
-      const columnsStr = columns.join(', ');
-      const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
-      
-      const query = `INSERT INTO organizations (${columnsStr}) VALUES (${placeholders}) RETURNING *`;
-      const result = await db.execute(sql.raw(query), ...values);
-      
-      return result.rows[0] as Organization;
-    } catch (error) {
-      console.error('Error creating organization:', error);
-      throw error;
-    }
+    const id = this.currentOrgId++;
+    const newOrg: Organization = { ...organization, id };
+    this.organizations.set(id, newOrg);
+    return Promise.resolve(newOrg);
   }
 
   async updateOrganization(id: number, organization: Partial<InsertOrganization>): Promise<Organization | undefined> {
-    try {
-      const updateColumns = Object.keys(organization)
-        .map((key, index) => `${key} = $${index + 2}`);
-      
-      if (updateColumns.length === 0) {
-        return this.getOrganization(id);
-      }
-      
-      const values = Object.values(organization);
-      const query = `UPDATE organizations SET ${updateColumns.join(', ')} WHERE id = $1 RETURNING *`;
-      
-      const result = await db.execute(sql.raw(query), id, ...values);
-      return result.rows[0] as Organization;
-    } catch (error) {
-      console.error('Error updating organization:', error);
-      return undefined;
-    }
+    const existingOrg = this.organizations.get(id);
+    if (!existingOrg) return Promise.resolve(undefined);
+    
+    const updatedOrg = { ...existingOrg, ...organization };
+    this.organizations.set(id, updatedOrg);
+    return Promise.resolve(updatedOrg);
   }
 
   async deleteOrganization(id: number): Promise<boolean> {
-    try {
-      await db.execute(sql`DELETE FROM organizations WHERE id = ${id}`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting organization:', error);
-      return false;
-    }
+    return Promise.resolve(this.organizations.delete(id));
   }
 
   async getAllOrganizations(): Promise<Organization[]> {
-    try {
-      const result = await db.execute(sql`SELECT * FROM organizations`);
-      return result.rows as Organization[];
-    } catch (error) {
-      console.error('Error getting all organizations:', error);
-      return [];
-    }
+    return Promise.resolve(Array.from(this.organizations.values()));
   }
 
   async createActivity(activity: InsertActivity): Promise<Activity> {
-    try {
-      const columns = Object.keys(activity);
-      columns.push('timestamp'); // Add timestamp
-      
-      const values = Object.values(activity);
-      values.push(new Date()); // Add current date for timestamp
-      
-      const columnsStr = columns.join(', ');
-      const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
-      
-      const query = `INSERT INTO activities (${columnsStr}) VALUES (${placeholders}) RETURNING *`;
-      const result = await db.execute(sql.raw(query), ...values);
-      
-      return result.rows[0] as Activity;
-    } catch (error) {
-      console.error('Error creating activity:', error);
-      throw error;
-    }
+    const id = this.currentActivityId++;
+    const timestamp = new Date();
+    const newActivity: Activity = { ...activity, id, timestamp };
+    this.activities.set(id, newActivity);
+    return Promise.resolve(newActivity);
   }
 
   async getActivities(limit?: number): Promise<Activity[]> {
-    try {
-      let query = 'SELECT * FROM activities ORDER BY timestamp DESC';
-      
-      if (limit) {
-        query += ` LIMIT ${limit}`;
-      }
-      
-      const result = await db.execute(sql.raw(query));
-      return result.rows as Activity[];
-    } catch (error) {
-      console.error('Error getting activities:', error);
-      return [];
+    const activities = Array.from(this.activities.values())
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    if (limit) {
+      return Promise.resolve(activities.slice(0, limit));
     }
+    
+    return Promise.resolve(activities);
   }
 
   async getActivitiesByUser(userId: number): Promise<Activity[]> {
-    try {
-      const result = await db.execute(sql`
-        SELECT * FROM activities
-        WHERE user_id = ${userId}
-        ORDER BY timestamp DESC
-      `);
-      return result.rows as Activity[];
-    } catch (error) {
-      console.error('Error getting activities by user:', error);
-      return [];
-    }
+    return Promise.resolve(
+      Array.from(this.activities.values())
+        .filter(activity => activity.userId === userId)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    );
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
