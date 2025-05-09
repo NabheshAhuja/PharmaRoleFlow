@@ -5,6 +5,26 @@ import {
 import { db } from "../db";
 import { desc, eq, sql } from "drizzle-orm";
 
+// Helper function to map database rows to Activity objects
+function mapRowToActivity(row: any): Activity {
+  // Safely parse the timestamp
+  let timestamp: Date;
+  try {
+    timestamp = new Date(String(row.timestamp));
+  } catch (error) {
+    console.warn('Failed to parse timestamp, using current date', error);
+    timestamp = new Date();
+  }
+
+  return {
+    id: Number(row.id),
+    userId: row.user_id ? Number(row.user_id) : null,
+    action: String(row.action),
+    description: String(row.description),
+    timestamp
+  };
+}
+
 /**
  * Activity tracking service
  * Handles all activity-related database operations using Drizzle ORM
@@ -43,13 +63,7 @@ export class ActivityService {
         
       const result = await db.execute(query);
       
-      return result.rows.map(row => ({
-        id: Number(row.id),
-        userId: row.user_id ? Number(row.user_id) : null,
-        action: String(row.action),
-        description: String(row.description),
-        timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp)
-      }));
+      return result.rows.map(row => mapRowToActivity(row));
     } catch (error) {
       console.error('Error in getActivities:', error);
       throw error;
@@ -67,13 +81,7 @@ export class ActivityService {
         ORDER BY timestamp DESC
       `);
       
-      return result.rows.map(row => ({
-        id: Number(row.id),
-        userId: row.user_id ? Number(row.user_id) : null,
-        action: String(row.action),
-        description: String(row.description),
-        timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp)
-      }));
+      return result.rows.map(row => mapRowToActivity(row));
     } catch (error) {
       console.error('Error in getActivitiesByUser:', error);
       throw error;
