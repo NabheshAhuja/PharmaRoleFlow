@@ -49,7 +49,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM users WHERE id = $1',
         [id]
       );
@@ -68,7 +68,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM users WHERE username = $1',
         [username]
       );
@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
         region, state, city, pincode, address, managerId 
       } = userData;
       
-      const result = await pool.query(
+      const result = await this.pool.query(
         `INSERT INTO users (
           username, password, full_name, email, 
           role, status, organization_id, region, 
@@ -205,7 +205,7 @@ export class DatabaseStorage implements IStorage {
         RETURNING *
       `;
       
-      const result = await pool.query(query, values);
+      const result = await this.pool.query(query, values);
       
       if (result.rows.length === 0) {
         return undefined;
@@ -220,7 +220,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: number): Promise<boolean> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'DELETE FROM users WHERE id = $1 RETURNING id',
         [id]
       );
@@ -234,8 +234,8 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      const result = await pool.query('SELECT * FROM users');
-      return result.rows.map(row => this.mapUserFromDb(row));
+      const result = await this.pool.query('SELECT * FROM users');
+      return result.rows.map((row: any) => this.mapUserFromDb(row));
     } catch (error) {
       console.error('Error in getAllUsers:', error);
       throw error;
@@ -244,12 +244,12 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByRole(role: string): Promise<User[]> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM users WHERE role = $1',
         [role]
       );
       
-      return result.rows.map(row => this.mapUserFromDb(row));
+      return result.rows.map((row: any) => this.mapUserFromDb(row));
     } catch (error) {
       console.error('Error in getUsersByRole:', error);
       throw error;
@@ -258,12 +258,12 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: number): Promise<User[]> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM users WHERE organization_id = $1',
         [organizationId]
       );
       
-      return result.rows.map(row => this.mapUserFromDb(row));
+      return result.rows.map((row: any) => this.mapUserFromDb(row));
     } catch (error) {
       console.error('Error in getUsersByOrganization:', error);
       throw error;
@@ -272,12 +272,12 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByManager(managerId: number): Promise<User[]> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM users WHERE manager_id = $1',
         [managerId]
       );
       
-      return result.rows.map(row => this.mapUserFromDb(row));
+      return result.rows.map((row: any) => this.mapUserFromDb(row));
     } catch (error) {
       console.error('Error in getUsersByManager:', error);
       throw error;
@@ -288,7 +288,7 @@ export class DatabaseStorage implements IStorage {
 
   async getOrganization(id: number): Promise<Organization | undefined> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM organizations WHERE id = $1',
         [id]
       );
@@ -308,7 +308,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const { name, type } = orgData;
       
-      const result = await pool.query(
+      const result = await this.pool.query(
         'INSERT INTO organizations (name, type) VALUES ($1, $2) RETURNING *',
         [name, type]
       );
@@ -349,7 +349,7 @@ export class DatabaseStorage implements IStorage {
         RETURNING *
       `;
       
-      const result = await pool.query(query, values);
+      const result = await this.pool.query(query, values);
       
       if (result.rows.length === 0) {
         return undefined;
@@ -364,7 +364,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOrganization(id: number): Promise<boolean> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'DELETE FROM organizations WHERE id = $1 RETURNING id',
         [id]
       );
@@ -378,8 +378,8 @@ export class DatabaseStorage implements IStorage {
 
   async getAllOrganizations(): Promise<Organization[]> {
     try {
-      const result = await pool.query('SELECT * FROM organizations');
-      return result.rows.map(row => this.mapOrganizationFromDb(row));
+      const result = await this.pool.query('SELECT * FROM organizations');
+      return result.rows.map((row: any) => this.mapOrganizationFromDb(row));
     } catch (error) {
       console.error('Error in getAllOrganizations:', error);
       throw error;
@@ -392,7 +392,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const { userId, action, description } = activityData;
       
-      const result = await pool.query(
+      const result = await this.pool.query(
         'INSERT INTO activities (user_id, action, description) VALUES ($1, $2, $3) RETURNING *',
         [userId, action, description]
       );
@@ -414,8 +414,8 @@ export class DatabaseStorage implements IStorage {
         params.push(limit);
       }
       
-      const result = await pool.query(query, params);
-      return result.rows.map(row => this.mapActivityFromDb(row));
+      const result = await this.pool.query(query, params);
+      return result.rows.map((row: any) => this.mapActivityFromDb(row));
     } catch (error) {
       console.error('Error in getActivities:', error);
       throw error;
@@ -424,12 +424,12 @@ export class DatabaseStorage implements IStorage {
 
   async getActivitiesByUser(userId: number): Promise<Activity[]> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         'SELECT * FROM activities WHERE user_id = $1 ORDER BY timestamp DESC',
         [userId]
       );
       
-      return result.rows.map(row => this.mapActivityFromDb(row));
+      return result.rows.map((row: any) => this.mapActivityFromDb(row));
     } catch (error) {
       console.error('Error in getActivitiesByUser:', error);
       throw error;
@@ -446,8 +446,8 @@ export class DatabaseStorage implements IStorage {
       password: dbUser.password,
       fullName: dbUser.full_name,
       email: dbUser.email,
-      role: dbUser.role,
-      status: dbUser.status,
+      role: dbUser.role as UserRoleType,
+      status: dbUser.status as UserStatusType,
       organizationId: dbUser.organization_id || null,
       region: dbUser.region || null,
       state: dbUser.state || null,
@@ -464,7 +464,7 @@ export class DatabaseStorage implements IStorage {
     return {
       id: dbOrg.id,
       name: dbOrg.name,
-      type: dbOrg.type
+      type: dbOrg.type as OrganizationTypeType
     };
   }
 
@@ -485,7 +485,7 @@ export class DatabaseStorage implements IStorage {
   async initializeDatabase(): Promise<void> {
     try {
       // Check if we need to initialize (no organizations exist)
-      const result = await pool.query('SELECT COUNT(*) FROM organizations');
+      const result = await this.pool.query('SELECT COUNT(*) FROM organizations');
       if (parseInt(result.rows[0].count) > 0) {
         console.log('Database already initialized, skipping...');
         return;
@@ -494,7 +494,7 @@ export class DatabaseStorage implements IStorage {
       console.log('Initializing database with default data...');
 
       // Create System organization
-      const orgResult = await pool.query(
+      const orgResult = await this.pool.query(
         'INSERT INTO organizations (name, type) VALUES ($1, $2) RETURNING *',
         ['System Administration', OrganizationType.SYSTEM]
       );
@@ -502,7 +502,7 @@ export class DatabaseStorage implements IStorage {
       const systemOrg = this.mapOrganizationFromDb(orgResult.rows[0]);
 
       // Create admin user
-      await pool.query(
+      await this.pool.query(
         `INSERT INTO users (
           username, password, full_name, email, 
           role, status, organization_id
