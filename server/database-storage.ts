@@ -7,9 +7,18 @@ import {
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { createHash } from "crypto";
-import * as pg from 'pg'
+import * as pg from 'pg';
 import dotenv from 'dotenv';
-const { Pool } = pg
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm";
+import * as schema from "../shared/schema";
+const { users } = schema;
+
+const { Pool } = pg;
+// Initialize Drizzle ORM with PostgreSQL
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const db = drizzle(pool, { schema });
+
 // PostgreSQL session store for session persistence
 const PostgresSessionStore = connectPg(session);
 
@@ -89,27 +98,33 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     try {
-      const { 
-        username, password, fullName, email, role, 
-        status = UserStatus.ACTIVE, organizationId, 
-        region, state, city, pincode, address, managerId 
+      const {
+        username, password, fullName, email, role,
+        status = UserStatus.ACTIVE, organizationId,
+        region, state, city, pincode, address, managerId
       } = userData;
-      
-      const result = await this.pool.query(
-        `INSERT INTO users (
-          username, password, full_name, email, 
-          role, status, organization_id, region, 
-          state, city, pincode, address, manager_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
-        RETURNING *`,
-        [
-          username, password, fullName, email, 
-          role, status, organizationId, region, 
-          state, city, pincode, address, managerId
-        ]
-      );
-      
-      return this.mapUserFromDb(result.rows[0]);
+
+      // Hash the password before storing
+      const hashedPassword = hashPassword(password);
+
+      // Use Drizzle ORM to insert the user
+      const [newUser] = await db.insert(users).values({
+        username,
+        password: hashedPassword,
+        fullName,
+        email,
+        role,
+        status,
+        organizationId,
+        region,
+        state,
+        city,
+        pincode,
+        address,
+        managerId
+      }).returning();
+
+      return newUser;
     } catch (error) {
       console.error('Error in createUser:', error);
       throw error;
@@ -499,32 +514,4 @@ export class DatabaseStorage implements IStorage {
       // Create System organization
       const orgResult = await this.pool.query(
         'INSERT INTO organizations (name, type) VALUES ($1, $2) RETURNING *',
-        ['System Administration', OrganizationType.SYSTEM]
-      );
-      
-      const systemOrg = this.mapOrganizationFromDb(orgResult.rows[0]);
-
-      // Create admin user
-      await this.pool.query(
-        `INSERT INTO users (
-          username, password, full_name, email, 
-          role, status, organization_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          'admin',
-          hashPassword('admin'),
-          'Admin User',
-          'admin@example.com',
-          UserRole.SUPER_ADMIN,
-          UserStatus.ACTIVE,
-          systemOrg.id
-        ]
-      );
-
-      console.log('Database initialized with admin user and system organization');
-    } catch (error) {
-      console.error('Error initializing database:', error);
-      throw error;
-    }
-  }
-}
+        ['System
